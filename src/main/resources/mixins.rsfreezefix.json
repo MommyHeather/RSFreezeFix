@@ -1,0 +1,8 @@
+{
+    "compatibilityLevel": "JAVA_8",
+    "required": "true",
+    "package": "com.github.raveninthedark.rsfreezefix.mixin",
+    "mixins": ["ItemStorageCacheMixin"],
+    "client": [],
+    "server": []
+  }

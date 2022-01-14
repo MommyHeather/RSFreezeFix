@@ -1,0 +1,86 @@
+package com.github.raveninthedark.tickcontrol.mixin;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+
+import com.github.raveninthedark.tickcontrol.TickControl;
+import com.github.raveninthedark.tickcontrol.util.PlayerTracker;
+//import com.github.raveninthedark.tickcontrol.util.TCConfig;
+import com.github.raveninthedark.tickcontrol.util.TCConfig;
+
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+import net.minecraft.entity.Entity;
+import net.minecraft.tileentity.ITickableTileEntity;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.IWorld;
+import net.minecraft.world.World;
+
+//import cf.terminator.laggoggles.profiler.ProfileManager;
+
+@Mixin(World.class)
+public abstract class WorldMixin extends net.minecraftforge.common.capabilities.CapabilityProvider<World> implements IWorld, AutoCloseable, net.minecraftforge.common.extensions.IForgeWorld {
+
+    protected WorldMixin(Class<World> baseClass) {
+        super(baseClass);
+        // TODO Auto-generated constructor stub
+    }
+
+
+
+    @Shadow
+    public boolean isClientSide;
+    
+    //private long tcTickTimeNano = 0;
+    //private long tcNanoTime = System.nanoTime();
+    //private int tcTickTime = 0;
+    //private int tcTotalTime = 0;
+
+    @Redirect(method = "tickBlockEntities()V", at = @At(
+        value = "INVOKE",
+        target = "net/minecraft/tileentity.ITickableTileEntity.tick()V"
+    ))
+    protected void OnITickableTick(ITickableTileEntity tickable){
+        if (isClientSide)
+        {
+            tickable.tick();
+            return;
+        }
+        if (TCConfig.Common.overrides.AlwaysTick.get().contains(((TileEntity) tickable).getType().getRegistryName().toString())) {
+            try {
+                tickable.tick();       
+            } catch (Exception e) {
+                //e.printStackTrace();
+                //TODO: handle exception
+            }
+            return;
+        }
+        
+        else if (TCConfig.Common.overrides.NeverTick.get().contains(((TileEntity) tickable).getType().getRegistryName().toString())) {
+            return;
+        }
+        
+
+
+        BlockPos blockPos = ((TileEntity) tickable).getBlockPos();
+
+        List<String> uuids = TickControl.getUuidFromPosition(((TileEntity) tickable).getLevel(),
+                blockPos);
+
+        if (uuids.size() > 0) {
+            PlayerTracker playerTracker = TickControl.playerTrackers.getOrDefault(uuids.get(0), TickControl.playerTrackers.getOrDefault("OFFLINE", null));
+            if (playerTracker == null && !TCConfig.Common.tickTimes.TickOfflinePlayers.get()) {
+                return; //should only ever fire if a) the player is offline AND b) ticking offline players is disabled.
+            }
+            playerTracker.addToQueue(tickable);
+        }
+    }
+}

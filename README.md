@@ -1,0 +1,1 @@
+Simple pure-mixin fix for Refined Storage causing multi-minute freezes.
